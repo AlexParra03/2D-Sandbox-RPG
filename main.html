@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body{ margin:10px; background:#CCC; }
+#my_canvas{ background:#FFF; border:#000 1px solid; }
+</style>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js">  </script>
+<script>
+
+    
+
+var testf = [];
+
+$(document).ready(function(){
+	var ctx = document.getElementById('my_canvas').getContext('2d');
+	var ctxWidth = ctx.canvas.width;
+	var ctxHeight = ctx.canvas.height;
+	var mouse = {x: 0, y:0};
+	
+	function readMouseMove(e){
+		mouse.x = e.clientX;
+		mouse.y = e.clientY;
+	}
+
+// -- Class PLAYER ----
+	function Player(){
+		this.x = 640;
+		this.y = 420;
+		this.width = 40;
+		this.height = 40;
+		this.rotation = 0;
+		this.speed = 3;
+		
+		this.moveUDLR = [false,false,false,false];  //boolean for testing movement UP - DOWN - LEFT - RIGHT
+		
+		//make array of Image() objects or Textures
+		this.textures = [];
+		this.textures[0] = new Image();
+		this.textures[0].src = "https://encrypted-tbn3.gstatic.com/images?q=tbn:ANd9GcRF28jsXli2t1iW32ABRRypXek04-tvwOF3bP_Zi1cHlHcpLNy9";
+		
+		this.update = function(){
+			this.rotateToMouse();
+			this.move();
+		}
+		
+		this.renderGUI = function(){ //renderGUI will not go into Update() function
+		
+		}
+		
+		this.render = function(){ //render will not go into Update() function
+			ctx.save();
+			ctx.translate(ctxWidth/2, ctxHeight/2);
+			ctx.rotate(this.rotation);
+			ctx.drawImage(this.textures[0] , -(this.width / 2), -(this.height / 2) ); //drawing image from the center
+			
+			ctx.restore();
+		}
+		
+		this.inputKeyDown = function(key, Up_Key, Down_Key, Left_Key, Right_Key){
+			switch(key){
+				case Up_Key:
+					this.moveUDLR[0] = true;
+					break;
+				case Down_Key:
+					this.moveUDLR[1] = true;
+					break;
+				case Left_Key:
+					this.moveUDLR[2] = true;
+					break;
+				case Right_Key:
+					this.moveUDLR[3] = true;
+					break;        
+			}
+		}
+		
+		this.inputKeyUp = function(key, Up_Key, Down_Key, Left_Key, Right_Key){
+			switch(key){
+				case Up_Key:
+					this.moveUDLR[0] = false;
+					break;
+				case Down_Key:
+					this.moveUDLR[1] = false;
+					break;
+				case Left_Key:
+					this.moveUDLR[2] = false;
+					break;
+				case Right_Key:
+					this.moveUDLR[3] = false;
+					break;  
+			}    
+		}
+		
+		this.move = function(){
+			if (this.moveUDLR[0]) { this.y -= this.speed }
+			else if (this.moveUDLR[1]) {this.y += this.speed}
+			if (this.moveUDLR[2]) {this.x -= this.speed}
+			else if (this.moveUDLR[3]) {this.x += this.speed}
+		}
+		
+		this.rotateToMouse = function(){
+			this.rotation = Math.atan2(mouse.y - (ctxHeight / 2) + (this.width / 2), mouse.x - (ctxWidth/2) + (this.width / 2) );
+		}
+		
+		this.getXTile = function(tileSize){
+			return Math.round( (this.x / tileSize)-0.5); 
+		}
+		this.getYTile = function(tileSize){
+			return Math.round( (this.y / tileSize) -0.5); 
+		}
+		this.getXTileSection = function(tileSize){
+			return -(this.x % tileSize)
+		}
+		this.getYTileSection = function(tileSize){
+			return -(this.y % tileSize)
+		}
+
+	}
+
+// -- Class ZOMBIE ----
+	function Zombie(){
+		this.width = 40;
+		this.height = 40;
+		this.x = 400;
+		this.y = 400;
+		this.rotation = 0;
+		this.speed = 1;
+		this.moveUDLR = [false,false,false,false];  //booleans for testing movement UP - DOWN - LEFT - RIGHT
+		this.prey = null;
+		
+		//make array of Image() objects or Textures
+		this.textures = [];
+		this.textures[0] = new Image();
+		this.textures[0].src = "https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcQ1kpR85TEyY2J-PU5P4At7lpYZB_JY4CF8jvgjl5boc-mBC3tK";
+		
+		this.render = function(){
+			ctx.save();
+			ctx.translate(this.x, this.y);
+			ctx.rotate(this.rotation);
+			ctx.drawImage(this.textures[0] , -(this.width / 2), -(this.height / 2) ); //drawing image from the center
+			
+			ctx.restore();
+		}
+		
+		this.update = function(){
+			this.chasePrey();
+			this.move();
+		}
+		
+		
+		this.chasePrey = function(){
+			if (this.prey) {  //if 'this' found a prey - if prey != null
+				this.rotation = Math.atan2(this.prey.y - this.y, this.prey.x - this.x);
+				//Using Movement Array UDLR - When moving LEFT is turned on, moving RIGHT is turned off automatically and vic. Also works with Up and Down
+				if (this.x >= this.prey.x) {this.moveUDLR[2] = true; this.moveUDLR[3] = false}
+				else if (this.x < this.prey.x ) {this.moveUDLR[3] = true; this.moveUDLR[2] = false}
+				if (this.y >= this.prey.y) {this.moveUDLR[0] = true; this.moveUDLR[1] = false}
+				else if (this.y < this.prey.y) {this.moveUDLR[1] = true; this.moveUDLR[0] = false}
+			};
+		}
+		
+		this.move = function(){
+			if (this.moveUDLR[0]) { this.y -= this.speed }
+			else if (this.moveUDLR[1]) {this.y += this.speed}
+			if (this.moveUDLR[2]) {this.x -= this.speed}
+			else if (this.moveUDLR[3]) {this.x += this.speed}
+		}
+	
+	
+	
+	
+	}
+	
+// -- Class MAP ----
+	function Map(player){
+		this.width = 40;
+		this.height = 40;
+		this.tileSize = 50;
+		this.matrix = [];
+		this.collitionMatrix = [];
+		this.player = player;
+		
+		//make array of Image() objects or Textures
+		this.textures = [];
+		
+		this.textures[0] = new Image();
+		this.textures[0].src = "https://encrypted-tbn2.gstatic.com/images?q=tbn:ANd9GcTZbkgnP38QkrBj8nZepzWMUzanF6v_dJGNyukSEKyICqcHW07T";
+		this.textures[1] = new Image();
+		this.textures[1].src = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTtBHhls0wCL6wRr1bpdmKfV4GL1iSs8PChXazhbWXkFF_RhdTGFA";
+		this.textures[2] = new Image();
+		this.textures[2].src = "https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcR-JrbGhJb3GGoK7pHNH_3Xxk5d5QBOvCRZpq0CpxGMaxTTNcX1JQ";
+		
+		this.loadCollision = function(){
+			//Makes a boolean matrix about if can collide or not.
+			var matrix = [];
+			for(var h=1; h<this.height+1; h++){
+				var row = [];
+				for(var w=1; w<this.width+1; w++){
+					row[w-1] = 0; 
+				}
+				matrix.push(row);
+			}
+			this.collitionMatrix = matrix;
+		}
+		
+		this.load = function(){
+			var matrix = [];
+			for(var h=1; h<this.height+1; h++){
+				var row = [];
+				for(var w=1; w<this.width+1; w++){
+					row[w-1] = 0; 
+				}
+				matrix.push(row);
+			}
+			this.matrix = matrix;
+		}
+		
+		// fix: some images are draw before loaded
+		this.render2 = function(){
+			var tilesRight = (ctxWidth / this.tileSize) / 2;  //How many tiles will be drawn at the Right Side
+			var tilesTop = (ctxHeight / this.tileSize) / 2;   //How many tiles will be drawn at the Top Side
+			var xTile = this.player.getXTile(this.tileSize) - tilesRight;    //Centering player; rendering only visible Tiles 
+			var yTile = this.player.getYTile(this.tileSize) - tilesTop;
+
+			try {
+				for(var r= 0; r< (tilesTop*2)+1; r++){  //Rendering Top Tiles, Bottom tiles, and Center tile: (# Tiles Top) + (#Tiles Bottom) + (1 Tile Center) = tilesTop*2 + 1
+					
+					for(var c= 0; c< (tilesRight*2)+1 ; c++){ ////Rendering Left Tiles, Right tiles, and Center tile
+						//                Rendering visible tiles             ;  adding the remainder to tile position to make a smooth movement; 
+						ctx.drawImage(this.textures[ this.matrix[yTile][xTile] ], c*this.tileSize + (this.player.getXTileSection(this.tileSize)) , r*this.tileSize + (this.player.getYTileSection(this.tileSize)) ); //every number in matrix means a specific Tile Texture
+						xTile++;
+					};
+					xTile = this.player.getXTile(this.tileSize) - tilesRight;
+					yTile++;
+				}	
+			} catch(err) { console.log(err); }
+		}
+		
+		this.render = function(){  //working function
+			try {
+				for(var r= 0; r< 15; r++){  //Draw 11 tiles, 5 left, 5 right and 1 in center
+					for(var c= 0; c< 15; c++){ //Same
+						
+						ctx.drawImage(this.textures[ this.matrix[r][c] ], c*this.tileSize, r*this.tileSize ); //every number in matrix means a specific Tile Texture
+					}
+				}
+			} catch(err) { alert("World has not loaded. "); console.log(err); console.log(" " + this.matrix)}
+		}
+		
+		this.scanCollision = function(){
+		 //test if the player is colliding with a tile while moving
+			var collisionUDLR = []; //array containing information about collidable tiles 
+			
+			
+			
+			if(this.collitionMatrix[ this.player.getYTile(this.tileSize) ][ this.player.getXTile(this.tileSize) ]){
+				
+			}
+		
+		}
+		
+	
+	}
+	
+
+	var player = new Player();
+	
+	var world = new Map(player);
+	world.load();
+	//testing new Tiles
+	world.matrix[2][3] = 1; 
+	world.matrix[5][9] = 1; 
+	
+	
+	
+	//var zombie = new Zombie();
+	//zombie.prey = player;
+	
+
+	
+
+	function MainLoop(){
+		requestAnimationFrame(MainLoop);
+		ctx.clearRect(0,0,ctxWidth, ctxHeight);
+		
+		//world.render( );
+		world.render2();
+		
+		//zombie.render();
+		//zombie.update();
+		
+		player.update();
+		player.render();	
+
+	}
+	
+	MainLoop();
+	
+	
+	
+
+	window.addEventListener('keydown', function(event) {  //enables Input
+		player.inputKeyDown(event.keyCode, 87, 83, 65, 68);
+
+	})
+
+	window.addEventListener('keyup', function(event) {  //enables Input
+		player.inputKeyUp(event.keyCode, 87, 83, 65, 68);
+
+	})
+
+
+	document.onmousemove = readMouseMove;
+
+
+
+})
+
+
+
+
+
+
+
+</script>
+</head>
+
+<body>
+<canvas id="my_canvas" width="600" height="600"></canvas>
+<p> Move with A-S-D-W. Shoot with Left Click </p>
+</body>  
+</html>
